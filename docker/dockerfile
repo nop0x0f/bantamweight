@@ -1,0 +1,75 @@
+FROM debian:stable
+
+ARG SSHD_CONFIG=sshd_config
+ARG HOST_RSA_KEY
+ARG HOST_PUB_RSA_KEY
+ARG DEV_PUB_KEY
+ARG PROJECTNAME
+ARG USERNAME=root
+ARG REPO
+ARG PATH_TO_PROJECT=/root/dev/
+ARG CLVERSION=2022.1
+ARG CARGO_HOME=/root/.cargo
+ARG RUSTUP_HOME=/root/.rustup
+
+
+USER $USERNAME
+ENV PATH "$PATH:$CARGO_HOME/bin:$RUSTUP_HOME/bin"
+ENV RUSTUP_HOME=$RUSTUP_HOME
+ENV CARGO_HOME=$CARGO_HOME
+
+#################
+#remote dev setup
+#################
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+		openssh-server\
+        ca-certificates \
+        gcc \
+        libc6-dev \
+        wget \
+		git \
+		curl \
+        ;
+
+COPY --chown=0:0 ${SSHD_CONFIG} /etc/ssh/sshd_config
+COPY --chown=0:0 ${HOST_RSA_KEY} /etc/ssh/ssh_host_rsa_key
+COPY --chown=0:0 ${HOST_PUB_RSA_KEY} /etc/ssh/ssh_host_rsa_key.pub
+RUN chmod 400 /etc/ssh/ssh_host_rsa_key
+
+RUN mkdir /root/.ssh
+RUN touch /root/.ssh/authorized_keys
+ADD --chown=0:0 ${DEV_PUB_KEY} /root/.ssh/authorized_keys
+
+RUN mkdir /root/dev
+
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+RUN --mount=type=ssh cd /root/dev; git clone $REPO
+
+#doesn't really work, wants to install via gateway
+RUN mkdir -p /root/dev/.cache/JetBrains/RemoteDev/dist/
+RUN curl -L https://download.jetbrains.com/cpp/CLion-$CLVERSION.tar.gz --output /root/dev/.cache/JetBrains/RemoteDev/dist/CLion-$CLVERSION.tar.gz
+RUN cd /root/dev/.cache/JetBrains/RemoteDev/dist; tar -xvzf CLion-$CLVERSION.tar.gz
+RUN rm /root/dev/.cache/JetBrains/RemoteDev/dist/CLion-$CLVERSION.tar.gz
+
+## install rust plugin for clion
+RUN cd /root/dev/.cache/JetBrains/RemoteDev/dist; cd $(ls -t1|head -n 1); cd bin; ./remote-dev-server.sh installPlugins $PATH_TO_PROJECT org.rust.lang
+
+RUN cd /root/dev/.cache/JetBrains/RemoteDev/dist; cd $(ls -t1|head -n 1); cd bin;./remote-dev-server.sh registerBackendLocationForGateway
+
+###########
+#rust setup
+###########
+RUN echo source $CARGO_HOME/env >> /root/.bashrc
+RUN echo PATH=$PATH:$CARGO_HOME/bin >> /root/.bashrc
+RUN echo RUSTUP_HOME=$RUSTUP_HOME >> /root/.bashrc
+RUN echo CARGO_HOME=$CARGO_HOME >> /root/.bashrc
+RUN bash; curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+RUN bash; rustup default stable
+
+EXPOSE 22
+#get setup done before manual start for docker
+RUN service ssh start
+ENTRYPOINT ["/usr/sbin/sshd", "-D", "-e"]

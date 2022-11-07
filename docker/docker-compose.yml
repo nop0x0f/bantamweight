@@ -1,0 +1,22 @@
+version: "0.1"
+
+services:
+    dev:
+        ports: 
+            - "2222:22"
+        build:
+            context: .
+            args:
+                SSHD_CONFIG: sshd_config
+                HOST_RSA_KEY: keys/dockerkeys
+                HOST_PUB_RSA_KEY: keys/dockerkeys.pub
+                DEV_PUB_KEY: dev_keys/dev_id_rsa.pub
+                PROJECTNAME: bantamweight
+                USERNAME: root
+                REPO: git@github.com:nop0x0f/bantamweight.git
+                PATH_TO_PROJECT: /root/dev/bantamweight
+                CLVERSION: 2022.1.2
+                CARGO_HOME: /root/.cargo
+                RUSTUP_HOME: /root/.rustup
+            ssh:
+                - default=dev_keys/bantamweight_git_rsa
