@@ -47,12 +47,19 @@ fn draw_box(xsize: usize, ysize:usize) -> String{
 #[test]
 fn draw_6x6_box(){
     let mut out = String::new();
-    out.push_str(concat!("+-----------+",
-                                 "|           |",
-                                 "|           |",
-                                 "|           |",
-                                 "|           |",
-                                 "+-----------+"));
-    let mut ret = draw_box(6,6);
+    out.push_str(concat!("+----+",
+                               "|    |",
+                               "|    |",
+                               "|    |",
+                               "|    |",
+                               "+----+"));
+    let ret = draw_box(6,6);
+    let result = out.eq(&ret);
+    if !result {
+        print!("{}",ret);
+        println!("\r\ncompares to");
+        print!("{}",out);
+        println!();
+    }
     assert!(out.eq(&ret));
 }
